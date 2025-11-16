@@ -1,0 +1,848 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>THR33</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght-400;600;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --white-piece: #E0E0E0;
+            --black-piece: #333333;
+            --light-square: #FFD799;
+            /* Light wood color */
+            --dark-square: #C78C53;
+            /* Dark wood color */
+            --highlight-color: #4CAF50;
+            /* Green */
+            --selected-color: #1E88E5;
+            /* Blue */
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #F7F5F2;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        .board-container {
+            display: grid;
+            grid-template-columns: repeat(8, 1fr);
+            grid-template-rows: repeat(8, 1fr);
+            width: min(90vw, 500px);
+            height: min(90vw, 500px);
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
+            border-radius: 12px;
+            overflow: hidden;
+            border: 4px solid #8D6E63;
+        }
+
+        .square {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        .piece {
+            width: 80%;
+            height: 80%;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 0.9rem;
+            /* Slightly larger for flip count */
+            font-weight: 800;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+            transition: transform 0.1s, box-shadow 0.2s;
+            user-select: none;
+        }
+
+        .white-piece {
+            background-color: var(--white-piece);
+            color: var(--black-piece);
+            border: 3px solid #616161;
+        }
+
+        .black-piece {
+            background-color: var(--black-piece);
+            color: var(--white-piece);
+            border: 3px solid #C0C0C0;
+        }
+
+        .selected {
+            border: 3px solid var(--selected-color) !important;
+            transform: scale(1.05);
+            box-shadow: 0 0 10px var(--selected-color);
+        }
+
+        .highlight:hover {
+            background-color: rgba(76, 175, 80, 0.6) !important;
+            /* Lighter green on hover */
+        }
+
+        .highlight {
+            border: 3px solid var(--highlight-color);
+        }
+    </style>
+</head>
+
+<body class="p-4">
+
+    <div
+        class="flex flex-col lg:flex-row items-center justify-center space-y-8 lg:space-y-0 lg:space-x-12 max-w-4xl w-full">
+
+        <!-- Control Panel -->
+        <div class="w-full max-w-sm bg-white p-6 rounded-xl shadow-lg border border-gray-200 order-2 lg:order-1">
+            <h2 class="text-2xl font-bold mb-4 text-center text-gray-800">THR33</h2>
+
+            <div id="game-info" class="text-center mb-4 p-3 bg-indigo-50 rounded-lg">
+                <p class="text-lg font-semibold text-indigo-700" id="turn-display">Waiting to start...</p>
+                <p class="text-sm text-gray-600" id="turn-count-display"></p>
+                <div class="flex justify-around mt-2 text-sm font-medium">
+                    <p class="text-gray-800">You (White): <span id="white-count">12</span></p>
+                    <p class="text-gray-800">AI (Black): <span id="black-count">12</span></p>
+                </div>
+                <!-- NEW ADVANTAGE DISPLAY -->
+                <p class="mt-3 p-1 rounded-md font-bold text-sm" id="advantage-display"></p>
+                <!-- END NEW ADVANTAGE DISPLAY -->
+            </div>
+
+            <!-- Difficulty Selector -->
+            <div class="mb-6">
+                <label for="difficulty" class="block text-sm font-medium text-gray-700 mb-2">AI Difficulty</label>
+                <select id="difficulty"
+                    class="w-full p-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500 shadow-sm transition duration-150 ease-in-out">
+                    <option value="1">Easy (Depth 1)</option>
+                    <option value="2" selected>Medium (Depth 2)</option>
+                    <option value="3">Hard (Depth 3)</option>
+                </select>
+            </div>
+
+            <!-- Game Control Buttons -->
+            <div class="space-y-3">
+                <button id="start-button" onclick="startGame()"
+                    class="w-full bg-indigo-600 text-white p-3 rounded-xl font-semibold hover:bg-indigo-700 transition duration-150 ease-in-out shadow-md">
+                    Start New Game (You are White)
+                </button>
+                <button id="reset-button" onclick="startGame()"
+                    class="w-full bg-red-500 text-white p-2 rounded-xl font-medium hover:bg-red-600 transition duration-150 ease-in-out shadow-md"
+                    style="display:none;">
+                    Restart Game
+                </button>
+            </div>
+
+            <!-- Rules -->
+            <details class="mt-6 p-4 bg-gray-50 rounded-lg text-sm text-gray-700 border border-gray-200">
+                <summary class="font-bold text-base cursor-pointer text-indigo-700">Game Rules Summary</summary>
+                <ul class="list-disc list-inside mt-2 space-y-1">
+                    <li>Pieces move diagonally in <strong>any direction</strong> (forward/backward).</li>
+                    <li><strong>Standard Jump:</strong> Over any one piece, flips that piece.</li>
+                    <li><strong>Piece Death:</strong> If a piece is flipped a total of <strong>3 times</strong>, it is
+                        removed from the board. The number on the piece indicates its current flip count.</li>
+                    <li><strong>Line-Jump (Special Rule):</strong> If the current player has <strong>fewer</strong>
+                        pieces than the opponent, they can jump over <strong>any number</strong> of pieces (one or more)
+                        along a diagonal line to an empty spot. All jumped pieces flip color/check for death.</li>
+                    <li><strong>Multi-Turn:</strong> The player with more pieces gets <strong>two turns</strong> in a
+                        row.</li>
+                    <li><strong>Win:</strong> The first player to eliminate <strong>all</strong> of the opponent's
+                        pieces wins.</li>
+                </ul>
+            </details>
+        </div>
+
+        <!-- Game Board -->
+        <div id="board-ui" class="board-container order-1 lg:order-2">
+            <!-- Board squares will be injected here -->
+        </div>
+
+        <!-- Modal for Game Over -->
+        <div id="game-over-modal"
+            class="fixed inset-0 bg-gray-900 bg-opacity-75 z-50 hidden items-center justify-center p-4">
+            <div class="bg-white p-8 rounded-xl shadow-2xl text-center max-w-sm w-full">
+                <h3 id="modal-title" class="text-3xl font-extrabold mb-4 text-gray-800">Game Over!</h3>
+                <p id="modal-message" class="text-lg mb-6 text-gray-600"></p>
+                <button onclick="hideModal(); startGame();"
+                    class="bg-indigo-600 text-white p-3 rounded-xl font-semibold hover:bg-indigo-700 transition duration-150 ease-in-out w-full">
+                    Play Again
+                </button>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        // Global Constants
+        const BOARD_SIZE = 8;
+        const WHITE_PLAYER = 1; // Human Player
+        const BLACK_PLAYER = -1; // AI Player
+        const FLIP_DEATH_COUNT = 3; // New rule constant
+
+        // Global Game State
+        // Pieces are now objects: { color: 1/-1, flips: 0-2 } or 0 for empty
+        let board = [];
+        let currentPlayer = WHITE_PLAYER;
+        let selectedPiece = null;
+        let possibleMoves = [];
+        let isGameActive = false;
+        let multiTurnCount = 1;
+        let isAITurn = false;
+        let oldCounts = { white: 12, black: 12 }; // Tracks piece counts *before* the move for multi-turn logic
+
+        // DOM Elements
+        const boardUI = document.getElementById('board-ui');
+        const turnDisplay = document.getElementById('turn-display');
+        const turnCountDisplay = document.getElementById('turn-count-display');
+        const whiteCountDisplay = document.getElementById('white-count');
+        const blackCountDisplay = document.getElementById('black-count');
+        const startButton = document.getElementById('start-button');
+        const resetButton = document.getElementById('reset-button');
+        const difficultySelector = document.getElementById('difficulty');
+        const modal = document.getElementById('game-over-modal');
+        const modalTitle = document.getElementById('modal-title');
+        const modalMessage = document.getElementById('modal-message');
+        const advantageDisplay = document.getElementById('advantage-display'); // <-- NEW DOM ELEMENT
+
+        // --- Utility Functions ---
+
+        /**
+         * Converts coordinates (row, col) to a 1D index (0-63).
+         */
+        const toIndex = (r, c) => r * BOARD_SIZE + c;
+
+        /**
+         * Counts the number of pieces for each player based on current color.
+         */
+        const countPieces = (currentBoard) => {
+            let white = 0;
+            let black = 0;
+            for (const piece of currentBoard) {
+                if (piece !== 0) { // Check if it's a piece object
+                    if (piece.color === WHITE_PLAYER) white++;
+                    if (piece.color === BLACK_PLAYER) black++;
+                }
+            }
+            return { white, black };
+        };
+
+        /**
+         * Deep copies the board state, including piece objects.
+         */
+        const copyBoard = (currentBoard) => currentBoard.map(item => item === 0 ? 0 : { ...item });
+
+        // --- Movement and Jump Logic ---
+
+        const DIRECTIONS = [
+            { dr: -1, dc: -1 }, { dr: -1, dc: 1 },
+            { dr: 1, dc: -1 }, { dr: 1, dc: 1 }
+        ];
+
+
+        /**
+         * Finds all valid Line-Jumps for the disadvantaged player.
+         * The Line-Jump moves the piece along a diagonal to an empty spot, 
+         * jumping over ANY non-zero number of pieces.
+         * @returns {Array<{toR: number, toC: number, flippedPieces: Array<{r: number, c: number}>}>} List of line jumps
+         */
+        function getDisadvantagedJumps(currentBoard, r, c, player) {
+            const lineJumps = [];
+            const counts = countPieces(currentBoard);
+
+            // Condition 1: Player must be the disadvantaged one (fewer pieces than opponent).
+            const isDisadvantaged = (player === WHITE_PLAYER && counts.white < counts.black) ||
+                (player === BLACK_PLAYER && counts.black < counts.white);
+
+            if (!isDisadvantaged) return [];
+
+            for (const { dr, dc } of DIRECTIONS) {
+                let jumpedPieces = [];
+
+                for (let step = 1; step < BOARD_SIZE; step++) {
+                    const currR = r + step * dr;
+                    const currC = c + step * dc;
+
+                    if (currR < 0 || currR >= BOARD_SIZE || currC < 0 || currC >= BOARD_SIZE) break;
+
+                    const pieceValue = currentBoard[toIndex(currR, currC)];
+
+                    if (pieceValue !== 0) {
+                        // Found a piece on the path, add it to the list
+                        jumpedPieces.push({ r: currR, c: currC });
+                    } else {
+                        // Found an empty spot (potential landing)
+
+                        // Condition 2: Must have jumped at least one piece.
+                        if (jumpedPieces.length > 0) {
+                            lineJumps.push({
+                                toR: currR,
+                                toC: currC,
+                                jumpedPiece: null,
+                                flippedPieces: jumpedPieces
+                            });
+                        }
+
+                        // Stop search in this direction once an empty spot is hit, as the jump path ends here.
+                        break;
+                    }
+                }
+            }
+            return lineJumps;
+        }
+
+        /**
+         * Finds all legal moves (single move, standard jump, and line-jump) for a given piece.
+         * @returns {Array} List of possible moves/jumps
+         */
+        function getPieceMoves(currentBoard, r, c) {
+            const pieceObj = currentBoard[toIndex(r, c)];
+            if (pieceObj === 0) return [];
+
+            const player = pieceObj.color;
+            let moves = [];
+
+            // --- 1. Standard Moves and Jumps ---
+            for (const { dr, dc } of DIRECTIONS) {
+                const nextR = r + dr;
+                const nextC = c + dc;
+                const jumpR = r + 2 * dr;
+                const jumpC = c + 2 * dc;
+
+                // Single diagonal move (move type: Standard Move)
+                if (nextR >= 0 && nextR < BOARD_SIZE && nextC >= 0 && nextC < BOARD_SIZE && currentBoard[toIndex(nextR, nextC)] === 0) {
+                    moves.push({ toR: nextR, toC: nextC, jumpedPiece: null, flippedPieces: null });
+                }
+
+                // Standard Jump (move type: Standard Jump)
+                if (jumpR >= 0 && jumpR < BOARD_SIZE && jumpC >= 0 && jumpC < BOARD_SIZE) {
+                    const jumpedPiece = currentBoard[toIndex(nextR, nextC)];
+                    const landingSquare = currentBoard[toIndex(jumpR, jumpC)];
+
+                    // Must jump over a piece (not 0) to an empty spot (is 0)
+                    if (jumpedPiece !== 0 && landingSquare === 0) {
+                        moves.push({
+                            toR: jumpR,
+                            toC: jumpC,
+                            jumpedPiece: { r: nextR, c: nextC },
+                            flippedPieces: null
+                        });
+                    }
+                }
+            }
+
+            // --- 2. Line-Jumps (if disadvantaged) ---
+            const lineJumps = getDisadvantagedJumps(currentBoard, r, c, player);
+            moves = moves.concat(lineJumps);
+
+            return moves;
+        }
+
+        /**
+         * Gets all valid moves for the current player on the board.
+         */
+        function getValidMoves(currentBoard, player) {
+            const allMoves = [];
+            for (let r = 0; r < BOARD_SIZE; r++) {
+                for (let c = 0; c < BOARD_SIZE; c++) {
+                    const pieceObj = currentBoard[toIndex(r, c)];
+                    if (pieceObj !== 0 && pieceObj.color === player) {
+                        const pieceMoves = getPieceMoves(currentBoard, r, c);
+                        for (const move of pieceMoves) {
+                            allMoves.push({ fromR: r, fromC: c, ...move });
+                        }
+                    }
+                }
+            }
+            return allMoves;
+        }
+
+        /**
+         * Applies a move (or jump) to the board and performs the color flip/death.
+         */
+        function applyMove(originalBoard, move) {
+            // CRITICAL: Deep copy to prevent state corruption in Minimax
+            const newBoard = copyBoard(originalBoard);
+
+            // Piece being moved is the *entire object*
+            const pieceObj = newBoard[toIndex(move.fromR, move.fromC)];
+
+            // 1. Move the piece
+            newBoard[toIndex(move.toR, move.toC)] = pieceObj;
+            newBoard[toIndex(move.fromR, move.fromC)] = 0;
+
+            // Function to handle flipping/killing a single piece
+            const processFlip = (r, c) => {
+                const index = toIndex(r, c);
+                const flippedPiece = newBoard[index];
+
+                if (flippedPiece !== 0) {
+                    flippedPiece.flips++;
+                    if (flippedPiece.flips >= FLIP_DEATH_COUNT) {
+                        newBoard[index] = 0; // Piece dies!
+                    } else {
+                        flippedPiece.color *= -1; // Flip color
+                    }
+                }
+            };
+
+            // 2. Handle color flip if it was a Standard Jump
+            if (move.jumpedPiece) {
+                processFlip(move.jumpedPiece.r, move.jumpedPiece.c);
+            }
+
+            // 3. Handle color flip if it was a Line-Jump
+            if (move.flippedPieces) {
+                for (const piece of move.flippedPieces) {
+                    processFlip(piece.r, piece.c);
+                }
+            }
+            return newBoard;
+        }
+
+
+        /**
+         * Switches the turn and handles the multi-turn rule based on immediate piece count.
+         */
+        function nextTurn() {
+            const playerJustMoved = currentPlayer;
+            const originalMultiTurnCount = multiTurnCount;
+
+            // 1. Decrement the remaining turns for the move just made.
+            multiTurnCount--;
+
+            // 2. Check piece counts *after* the move is completed
+            const newCounts = countPieces(board);
+            const whiteMajorityNew = newCounts.white > newCounts.black;
+            const blackMajorityNew = newCounts.black > newCounts.white;
+
+            // Check counts *before* the move (using the globally stored state)
+            const whiteMajorityOld = oldCounts.white > oldCounts.black;
+            const blackMajorityOld = oldCounts.black > oldCounts.white;
+
+            // --- Multi-Turn Logic (Strict Max 2 Turns) ---
+
+            // A player gains the majority if they didn't have it before, but they do now.
+            const playerGainedMajority = (playerJustMoved === WHITE_PLAYER && !whiteMajorityOld && whiteMajorityNew) ||
+                (playerJustMoved === BLACK_PLAYER && !blackMajorityOld && blackMajorityNew);
+
+            // If the player gained majority on their first move (originalMultiTurnCount === 1),
+            // they get a bonus turn (multiTurnCount resets to 1), resulting in a max of 2 moves total.
+            if (originalMultiTurnCount === 1 && playerGainedMajority) {
+                multiTurnCount = 1;
+                // currentPlayer remains the same
+            } else if (multiTurnCount <= 0) {
+                // If the turn count is 0 or less, the player's sequence is exhausted.
+
+                currentPlayer = -playerJustMoved; // Switch player
+
+                // Determine the new player's turns based on the new piece counts
+                const newPlayer = currentPlayer;
+                const newPlayerHasMajority = (newPlayer === WHITE_PLAYER && whiteMajorityNew) ||
+                    (newPlayer === BLACK_PLAYER && blackMajorityNew);
+
+                // The new player gets 2 turns if they have the majority, or 1 otherwise.
+                multiTurnCount = newPlayerHasMajority ? 2 : 1;
+            }
+
+            // --- Win/Loss and AI check ---
+
+            checkWinCondition();
+
+            // Start AI turn if necessary
+            if (currentPlayer === BLACK_PLAYER && isGameActive) {
+                isAITurn = true;
+                setTimeout(startAITurn, 500); // Small delay for UX
+            } else {
+                isAITurn = false;
+            }
+
+            renderState();
+        }
+
+        /**
+         * Checks if the game has ended based on the opponent having 0 pieces.
+         */
+        function checkWinCondition() {
+            const counts = countPieces(board);
+            let winner = null;
+            let message = '';
+
+            // Win Condition: Opponent has 0 pieces left (Total Elimination).
+            if (counts.black === 0) {
+                winner = 'White (You)';
+                modalTitle.classList.remove('text-red-600');
+                modalTitle.classList.add('text-green-600');
+                message = "The AI (Black) has run out of pieces. Congratulations, you win by total elimination!";
+            } else if (counts.white === 0) {
+                winner = 'Black (AI)';
+                modalTitle.classList.remove('text-green-600');
+                modalTitle.classList.add('text-red-600');
+                message = "You (White) have run out of pieces. The AI wins by total elimination!";
+            } else if (getValidMoves(board, currentPlayer).length === 0) {
+                winner = -currentPlayer === WHITE_PLAYER ? 'White (You)' : 'Black (AI)';
+                message = `Current player (${currentPlayer === WHITE_PLAYER ? 'White' : 'Black'}) has no valid moves. The other player wins!`;
+            }
+
+            if (winner) {
+                isGameActive = false;
+                showModal(`Game Over!`, message);
+            }
+        }
+
+        // --- AI Logic (Minimax) ---
+
+        /**
+         * Heuristic evaluation function for the board state.
+         */
+        function evaluateBoard(currentBoard) {
+            const counts = countPieces(currentBoard);
+            let score = 0;
+
+            // 1. Piece Count Difference (Most important)
+            score += (counts.white - counts.black) * 100;
+
+            // 2. Flip Count/Risk Factor
+            for (const piece of currentBoard) {
+                if (piece !== 0) {
+                    // Pieces closer to death are riskier, AI wants to target enemy pieces with high flip count
+                    // and protect its own pieces with high flip count.
+                    const riskFactor = (FLIP_DEATH_COUNT - piece.flips) / FLIP_DEATH_COUNT;
+                    score += piece.color * riskFactor * 25; // Less weight than raw piece count
+                }
+            }
+
+            // 3. Win/Loss Bonus (Immediate Win/Loss is highly valuable) - UPDATED FOR ELIMINATION
+            if (counts.black === 0) return 100000; // White wins (Black eliminated)
+            if (counts.white === 0) return -100000; // Black wins (White eliminated)
+
+            // 4. Central Control
+            for (let r = 0; r < BOARD_SIZE; r++) {
+                for (let c = 0; c < BOARD_SIZE; c++) {
+                    const piece = currentBoard[toIndex(r, c)];
+                    if (piece !== 0) {
+                        const centrality = 3.5 - Math.abs(r - 3.5) - Math.abs(c - 3.5);
+                        score += piece.color * centrality * 5;
+                    }
+                }
+            }
+
+            return score;
+        }
+
+        /**
+         * Minimax algorithm with Alpha-Beta Pruning.
+         */
+        function minimax(currentBoard, depth, isMaximizingPlayer, alpha, beta) {
+            const moves = getValidMoves(currentBoard, isMaximizingPlayer ? WHITE_PLAYER : BLACK_PLAYER);
+            const counts = countPieces(currentBoard);
+
+            // Base Case: Depth is 0 or no moves left, or a player has been eliminated (new win condition)
+            if (depth === 0 || moves.length === 0 || counts.white === 0 || counts.black === 0) {
+                return evaluateBoard(currentBoard);
+            }
+
+            if (isMaximizingPlayer) { // White (Human) - Maximizing
+                let maxEval = -Infinity;
+                for (const move of moves) {
+                    const newBoard = applyMove(currentBoard, move);
+                    const evaluation = minimax(newBoard, depth - 1, false, alpha, beta); // Switch to minimizing (AI)
+                    maxEval = Math.max(maxEval, evaluation);
+                    alpha = Math.max(alpha, maxEval);
+                    if (beta <= alpha) break;
+                }
+                return maxEval;
+            } else { // Black (AI) - Minimizing
+                let minEval = Infinity;
+                for (const move of moves) {
+                    const newBoard = applyMove(currentBoard, move);
+                    const evaluation = minimax(newBoard, depth - 1, true, alpha, beta);
+                    minEval = Math.min(minEval, evaluation);
+                    beta = Math.min(beta, minEval);
+                    if (beta <= alpha) break;
+                }
+                return minEval;
+            }
+        }
+
+        /**
+         * Finds the best move for the AI using Minimax.
+         */
+        function findBestMove() {
+            const currentDepth = parseInt(difficultySelector.value, 10);
+            const allMoves = getValidMoves(board, BLACK_PLAYER);
+
+            if (allMoves.length === 0) return null;
+
+            let bestMove = allMoves[0];
+            let minEval = Infinity;
+
+            for (const move of allMoves) {
+                const newBoard = applyMove(board, move);
+                // AI is minimizing (False/Negative player), so the next search depth maximizes (True/Positive player).
+                const evaluation = minimax(newBoard, currentDepth - 1, true, -Infinity, Infinity);
+
+                if (evaluation < minEval) {
+                    minEval = evaluation;
+                    bestMove = move;
+                }
+            }
+
+            return bestMove;
+        }
+
+        /**
+         * Executes the AI's move.
+         */
+        function startAITurn() {
+            if (!isGameActive || currentPlayer !== BLACK_PLAYER) return;
+
+            const bestMove = findBestMove();
+
+            if (bestMove) {
+                // CAPTURE OLD COUNTS BEFORE MOVE
+                oldCounts = countPieces(board);
+
+                board = applyMove(board, bestMove);
+                renderBoard();
+                nextTurn();
+            } else {
+                showModal("AI Has No Moves", "The AI (Black) has no valid moves and forfeits the rest of its turns.");
+                // Immediately switch to the human player and clear bonus status
+                currentPlayer = WHITE_PLAYER;
+                multiTurnCount = 1;
+                isAITurn = false;
+                renderState();
+            }
+        }
+
+
+        // --- UI and Interaction ---
+
+        /**
+         * Sets up the initial board state.
+         */
+        function setupGame() {
+            // Initialize board (8x8 = 64 squares)
+            board = Array(64).fill(0);
+
+            // White pieces (Rows 0, 1, 2)
+            for (let r = 0; r < 3; r++) {
+                for (let c = 0; c < BOARD_SIZE; c++) {
+                    if ((r + c) % 2 === 1) { // Only on dark squares
+                        board[toIndex(r, c)] = { color: WHITE_PLAYER, flips: 0 };
+                    }
+                }
+            }
+
+            // Black pieces (Rows 5, 6, 7)
+            for (let r = 5; r < 8; r++) {
+                for (let c = 0; c < BOARD_SIZE; c++) {
+                    if ((r + c) % 2 === 1) { // Only on dark squares
+                        board[toIndex(r, c)] = { color: BLACK_PLAYER, flips: 0 };
+                    }
+                }
+            }
+
+            currentPlayer = WHITE_PLAYER;
+            selectedPiece = null;
+            possibleMoves = [];
+            multiTurnCount = 1;
+            isGameActive = false; // Remains inactive until start button is pressed
+            isAITurn = false;
+            oldCounts = countPieces(board); // Capture initial counts
+
+            renderBoard();
+            renderState();
+        }
+
+        function startGame() {
+            setupGame(); // Reset to initial state (sets isGameActive=false)
+            isGameActive = true; // Activate the game
+            startButton.style.display = 'none';
+            resetButton.style.display = 'block';
+
+            // At start, counts are equal, so multiTurnCount is always 1.
+            multiTurnCount = 1;
+
+            renderState();
+        }
+
+        /**
+         * Renders the board state to the UI.
+         */
+        function renderBoard() {
+            boardUI.innerHTML = '';
+            for (let r = 0; r < BOARD_SIZE; r++) {
+                for (let c = 0; c < BOARD_SIZE; c++) {
+                    const index = toIndex(r, c);
+                    const pieceValue = board[index]; // Now an object or 0
+                    const isDarkSquare = (r + c) % 2 === 1;
+
+                    // This implements the alternating checkerboard pattern
+                    const square = document.createElement('div');
+                    square.className = `square ${isDarkSquare ? 'bg-dark-square' : 'bg-light-square'}`;
+                    square.dataset.r = r;
+                    square.dataset.c = c;
+                    square.onclick = () => handleSquareClick(r, c);
+
+                    // Check for highlights (valid move targets)
+                    const isHighlighted = possibleMoves.some(m => m.toR === r && m.toC === c);
+                    if (isHighlighted) {
+                        square.classList.add('highlight');
+                    }
+
+                    if (pieceValue !== 0) {
+                        const piece = document.createElement('div');
+                        // Use pieceValue.color for color class
+                        piece.className = `piece ${pieceValue.color === WHITE_PLAYER ? 'white-piece' : 'black-piece'}`;
+
+                        // Check for selection
+                        if (selectedPiece && selectedPiece.r === r && selectedPiece.c === c) {
+                            piece.classList.add('selected');
+                        }
+
+                        // Display the flip count instead of W/B
+                        piece.innerHTML = pieceValue.flips;
+                        square.appendChild(piece);
+                    }
+                    boardUI.appendChild(square);
+                }
+            }
+        }
+
+        /**
+         * Updates the game info panel.
+         */
+        function renderState() {
+            const counts = countPieces(board);
+            whiteCountDisplay.textContent = counts.white;
+            blackCountDisplay.textContent = counts.black;
+
+            // --- Advantage Display Logic ---
+            let advantageText = '';
+            let advantageClasses = '';
+
+            if (counts.white > counts.black) {
+                advantageText = 'Advantage: You (White)';
+                advantageClasses = 'bg-green-100 text-green-700';
+            } else if (counts.black > counts.white) {
+                advantageText = 'Advantage: AI (Black)';
+                advantageClasses = 'bg-red-100 text-red-700';
+            } else {
+                advantageText = 'Status: Even';
+                advantageClasses = 'bg-yellow-100 text-yellow-700';
+            }
+
+            advantageDisplay.textContent = advantageText;
+            // The Tailwind classes defined in the HTML structure are applied here dynamically
+            advantageDisplay.className = `mt-3 p-1 rounded-md font-bold text-sm text-center ${advantageClasses}`;
+            // --- End Advantage Display Logic ---
+
+
+            if (!isGameActive) {
+                turnDisplay.textContent = 'Game Ready. Press Start.';
+                turnCountDisplay.textContent = '';
+                return;
+            }
+
+            const playerText = currentPlayer === WHITE_PLAYER ? 'Your Turn (White)' : 'AI Turn (Black)';
+            turnDisplay.textContent = playerText;
+
+            // Determine if the current player has a piece majority for display purposes
+            const hasMajority = (currentPlayer === WHITE_PLAYER && counts.white > counts.black) ||
+                (currentPlayer === BLACK_PLAYER && counts.black > counts.white);
+
+            let multiTurnText = '';
+
+            // Display message if the current player is on a multi-turn sequence
+            if (multiTurnCount > 1 || (multiTurnCount === 1 && hasMajority)) {
+                const turnsRemaining = multiTurnCount === 1 ? 'turn' : 'turns';
+                multiTurnText = `Multi-Turn! ${multiTurnCount} ${turnsRemaining} remaining.`;
+            } else {
+                multiTurnText = '';
+            }
+
+            turnCountDisplay.textContent = multiTurnText;
+        }
+
+        /**
+         * Handles user clicking on a square.
+         */
+        function handleSquareClick(r, c) {
+            if (!isGameActive || currentPlayer !== WHITE_PLAYER || isAITurn) return;
+
+            const clickedPiece = board[toIndex(r, c)];
+
+            // 1. Clicked on a piece of the current player: Select it.
+            if (clickedPiece !== 0 && clickedPiece.color === currentPlayer) {
+                selectedPiece = { r, c };
+                // Update possible moves for the newly selected piece
+                possibleMoves = getPieceMoves(board, r, c);
+
+                // 2. Clicked on a valid target square: Make the move.
+            } else if (selectedPiece) {
+                const move = possibleMoves.find(m => m.toR === r && m.toC === c);
+
+                if (move) {
+                    const fullMove = { fromR: selectedPiece.r, fromC: selectedPiece.c, ...move };
+
+                    // CAPTURE OLD COUNTS BEFORE MOVE
+                    oldCounts = countPieces(board);
+
+                    // Apply the move and update the board
+                    board = applyMove(board, fullMove);
+
+                    // Clear selection and move on
+                    selectedPiece = null;
+                    possibleMoves = [];
+
+                    nextTurn(); // Switches player or decreases multi-turn counter
+                } else {
+                    // Clicked on an invalid square, clear selection
+                    selectedPiece = null;
+                    possibleMoves = [];
+                }
+
+                // 3. Clicked on an empty square or an opponent's piece without a selected piece: Do nothing.
+            } else {
+                selectedPiece = null;
+                possibleMoves = [];
+            }
+
+            renderBoard();
+            renderState();
+        }
+
+        /**
+         * Displays the game over modal.
+         */
+        function showModal(title, message) {
+            modalTitle.textContent = title;
+            modalMessage.textContent = message;
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        /**
+         * Hides the game over modal.
+         */
+        function hideModal() {
+            modal.classList.remove('flex');
+            modal.classList.add('hidden');
+        }
+
+        // Initialize the game state when the script loads
+        window.onload = setupGame;
+
+    </script>
+</body>
+
+</html>
